@@ -53,3 +53,7 @@ src/vendor/
 .vscode
 *.phar
 *.lock
+
+# Security testing files
+# =========================
+security_tests.php

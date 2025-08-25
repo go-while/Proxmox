@@ -9,7 +9,7 @@
    <div class="card">
       <div class="card-body">
          <h2>
-            Manage VLAN: {{ clientnetwork.vlan }}
+            Manage VLAN: {{ clientnetwork.vlan|e }}
          </h2>
       </div>
       <div class="card-body">
@@ -25,7 +25,7 @@
                 <div class="col">
                     <select class="form-select" name="client_id">
                     {% for client in clients.list %}
-                     <option value="{{ client.id }}" {% if clientnetwork.client_id == client.id %} selected {% endif %}>{{ client.id }}: {{ client.first_name }} {{ client.last_name }}</option>
+                     <option value="{{ client.id|e }}" {% if clientnetwork.client_id == client.id %} selected {% endif %}>{{ client.id|e }}: {{ client.first_name|e }} {{ client.last_name|e }}</option>
                     {% endfor %}
                     </select>
                 </div>
@@ -46,7 +46,7 @@
                 <div class="col">
                     <select class="form-select" name="ip_range">
                         {% for iprange in ipranges %}
-                           <option value="{{ iprange.id }}" {% if clientnetwork.ip_range == iprange.id %} selected {% endif %}>{{ iprange.cidr }}</option>
+                           <option value="{{ iprange.id|e }}" {% if clientnetwork.ip_range == iprange.id %} selected {% endif %}>{{ iprange.cidr|e }}</option>
                         {% endfor %}
                     </select>
                 </div>
