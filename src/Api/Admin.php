@@ -233,17 +233,38 @@ class Admin extends \Api_Abstract
      */
     public function servers_in_group($data)
     {
-        $sql = "SELECT * FROM `service_proxmox_server` WHERE `group` = '" . $data['group'] . "' AND `active` = 1";
+        $required = array(
+            'group' => 'Server group is missing',
+        );
+        $this->di['validator']->checkRequiredParamsForArray($required, $data);
 
-        $servers = $this->di['db']->getAll($sql);
+        // Use parameterized query to prevent SQL injection
+        $servers = $this->di['db']->find('service_proxmox_server', '`group` = :group AND `active` = 1', array(':group' => $data['group']));
 
+        $result = array();
         // remove password & api keys from results
-        foreach ($servers as $key => $server) {
-            $servers[$key]['root_password'] = '';
-            $servers[$key]['tokenvalue'] = '';
+        foreach ($servers as $server) {
+            $result[] = array(
+                'id' => $server->id,
+                'name' => $server->name,
+                'group' => $server->group,
+                'ipv4' => $server->ipv4,
+                'ipv6' => $server->ipv6,
+                'hostname' => $server->hostname,
+                'port' => $server->port,
+                'realm' => $server->realm,
+                'active' => $server->active,
+                'cpu_cores' => $server->cpu_cores,
+                'ram' => $server->ram,
+                'created_at' => $server->created_at,
+                'updated_at' => $server->updated_at,
+                // Explicitly exclude sensitive fields
+                'root_password' => '',
+                'tokenvalue' => '',
+            );
         }
 
-        return $servers;
+        return $result;
     }
 
     /**
@@ -252,8 +273,18 @@ class Admin extends \Api_Abstract
      */
     public function qemu_templates_on_server($data)
     {
-        $sql = "SELECT * FROM `service_proxmox_qemu_template` WHERE `server_id` = '" . $data['server_id'] . "'";
-        $templates = $this->di['db']->getAll($sql);
+        $required = array(
+            'server_id' => 'Server ID is missing',
+        );
+        $this->di['validator']->checkRequiredParamsForArray($required, $data);
+
+        // Validate server_id is numeric
+        if (!is_numeric($data['server_id'])) {
+            throw new \Box_Exception('Invalid server ID format');
+        }
+
+        // Use parameterized query to prevent SQL injection
+        $templates = $this->di['db']->find('service_proxmox_qemu_template', 'server_id = :server_id', array(':server_id' => (int)$data['server_id']));
         return $templates;
     }
 
@@ -370,6 +401,29 @@ class Admin extends \Api_Abstract
         );
         $this->di['validator']->checkRequiredParamsForArray($required, $data);
 
+        // Enhanced input validation
+        if (!filter_var($data['ipv4'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            throw new \Box_Exception('Invalid IPv4 address format');
+        }
+        
+        if (!empty($data['ipv6']) && !filter_var($data['ipv6'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+            throw new \Box_Exception('Invalid IPv6 address format');
+        }
+        
+        $port = (int)$data['port'];
+        if ($port < 1 || $port > 65535) {
+            throw new \Box_Exception('Port must be between 1 and 65535');
+        }
+        
+        if (!in_array($data['auth_type'], ['username', 'token'])) {
+            throw new \Box_Exception('Authentication type must be either "username" or "token"');
+        }
+        
+        // Validate hostname format
+        if (!preg_match('/^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$/', $data['hostname'])) {
+            throw new \Box_Exception('Invalid hostname format');
+        }
+
         // check if server already exists based on name, ipv4 or hostname
         $server = $this->di['db']->findOne('service_proxmox_server', 'name=:name OR ipv4=:ipv4 OR hostname=:hostname', array(':name' => $data['name'], ':ipv4' => $data['ipv4'], ':hostname' => $data['hostname']));
         if ($server) {
@@ -377,14 +431,14 @@ class Admin extends \Api_Abstract
         }
 
         $server                     = $this->di['db']->dispense('service_proxmox_server');
-        $server->name               = $data['name'];
-        $server->group              = $data['group'];
+        $server->name               = trim($data['name']);
+        $server->group              = trim($data['group'] ?? '');
         $server->ipv4               = $data['ipv4'];
-        $server->ipv6               = $data['ipv6'];
+        $server->ipv6               = $data['ipv6'] ?? '';
         $server->hostname           = $data['hostname'];
-        $server->port               = $data['port'];
-        $server->realm              = $data['realm'];
-        $server->active             = $data['active'];
+        $server->port               = $port;
+        $server->realm              = trim($data['realm']);
+        $server->active             = (int)$data['active'];
         $server->created_at         = date('Y-m-d H:i:s');
         $server->updated_at         = date('Y-m-d H:i:s');
 
@@ -435,10 +489,10 @@ class Admin extends \Api_Abstract
             'port'              => $server->port,
             'realm'             => $server->realm,
             'tokenname'         => $server->tokenname,
-            'tokenvalue'        => str_repeat("*", 26),
+            'tokenvalue'        => !empty($server->tokenvalue) ? '[HIDDEN]' : '',
             'root_user'         => $server->root_user,
-            'root_password'     => $server->root_password,
-            'admin_password'    => $server->admin_password,
+            'root_password'     => !empty($server->root_password) ? '[HIDDEN]' : '',
+            'admin_password'    => !empty($server->admin_password) ? '[HIDDEN]' : '',
             'active'            => $server->active,
         );
         return $output;
@@ -579,13 +633,16 @@ class Admin extends \Api_Abstract
         $serverstorage = $service->getStorageData($server);
 
         foreach ($serverstorage as $key => $value) {
-            $sql = "SELECT * FROM `service_proxmox_storage` WHERE server_id = " . $server_id . " AND storage = '" . $value['storage'] . "'";
-            $storage = $this->di['db']->getAll($sql);
+            // Validate storage name to prevent SQL injection
+            if (!isset($value['storage']) || !is_string($value['storage'])) {
+                continue; // Skip invalid storage entries
+            }
 
-            // if the storage exists, update it, otherwise create it
-            if (!empty($storage)) {
-                $storage = $this->di['db']->findOne('service_proxmox_storage', 'server_id=:server_id AND storage=:storage', array(':server_id' => $server_id, ':storage' => $value['storage']));
-            } else {
+            // Use parameterized query instead of string concatenation
+            $storage = $this->di['db']->findOne('service_proxmox_storage', 'server_id = :server_id AND storage = :storage', array(':server_id' => $server_id, ':storage' => $value['storage']));
+
+            // if the storage doesn't exist, create it
+            if (!$storage) {
                 $storage = $this->di['db']->dispense('service_proxmox_storage');
             }
 
@@ -616,13 +673,16 @@ class Admin extends \Api_Abstract
             // check if $value['template'] exists, and if it's content is 1
             if (!empty($value['template'])) {
                 if ($value['template'] == 1) {
-                    $sql = "SELECT * FROM `service_proxmox_qemu_template` WHERE server_id = " . $server_id . " AND vmid = " . $value['vmid'];
-                    $template = $this->di['db']->getAll($sql);
+                    // Validate vmid to prevent SQL injection
+                    if (!isset($value['vmid']) || !is_numeric($value['vmid'])) {
+                        continue; // Skip invalid vmid entries
+                    }
 
-                    // if the template exists, update it, otherwise create it
-                    if (!empty($template)) {
-                        $template = $this->di['db']->findOne('service_proxmox_qemu_template', 'server_id=:server_id AND vmid=:vmid', array(':server_id' => $server_id, ':vmid' => $value['vmid']));
-                    } else {
+                    // Use parameterized query instead of string concatenation
+                    $template = $this->di['db']->findOne('service_proxmox_qemu_template', 'server_id = :server_id AND vmid = :vmid', array(':server_id' => $server_id, ':vmid' => (int)$value['vmid']));
+
+                    // if the template doesn't exist, create it
+                    if (!$template) {
                         $template = $this->di['db']->dispense('service_proxmox_qemu_template');
                     }
                     $template->vmid = $value['vmid'];

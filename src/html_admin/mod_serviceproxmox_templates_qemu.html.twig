@@ -16,7 +16,7 @@
         <li class="breadcrumb-item">
             <a href="{{ 'serviceproxmox/templates'|alink }}">{{ 'Proxmox Configuration Templates'|trans }}</a>
         </li>
-        <li class="breadcrumb-item active" aria-current="page">Template {{vm_config_template.id}}</li>
+        <li class="breadcrumb-item active" aria-current="page">Template {{vm_config_template.id|e}}</li>
     </ol>
 {% endblock %}
 {% block content %}
@@ -42,7 +42,7 @@
                         {{ 'Name' | trans }}:    
                     </label>
                     <div class="col">
-                        <input class="form-control" type="text" name="name" value="{{vm_config_template.name}}" required placeholder="{{ 'Unique name to identify this template' | trans }}">
+                        <input class="form-control" type="text" name="name" value="{{vm_config_template.name|e}}" required placeholder="{{ 'Unique name to identify this template' | trans }}">
                     </div>
                 </div>
                 <div class="mb-3 row">
@@ -50,7 +50,7 @@
                         {{ 'Description' | trans }}:
                     </label>
                     <div class="col">
-                        <input class="form-control" type="text-area" name="description" value="{{vm_config_template.description}}" required placeholder="{{ 'Description' | trans }}">
+                        <input class="form-control" type="text-area" name="description" value="{{vm_config_template.description|e}}" required placeholder="{{ 'Description' | trans }}">
                     </div>
                 </div>
                 <div class="mb-3 row">
@@ -58,11 +58,11 @@
                         {{ 'CPU Cores' | trans }}:                                                                    
                     </label>
                     <div class="col-md-5">
-                            <input class="form-range" type="range" name="cpu_cores" value="{{vm_config_template.cores}}" min="1" max="128" step="1" oninput="cpuOutput.value = this.value+' Core(s)';">
+                            <input class="form-range" type="range" name="cpu_cores" value="{{vm_config_template.cores|e}}" min="1" max="128" step="1" oninput="cpuOutput.value = this.value+' Core(s)';">
                     </div>
                     <div class="col-md-2">
                         <output name="cpuOutput" for="cpu_cores">
-                        {{vm_config_template.cores}} Core(s)
+                        {{vm_config_template.cores|e}} Core(s)
                         </output>
                     </div>
                 </div>
@@ -71,11 +71,11 @@
                         {{ 'Memory' | trans }}:                                                                    
                     </label>
                     <div class="col-md-5">
-                            <input class="form-range" type="range" name="vmmemory" value="{{vm_config_template.memory}}" min="1" max="128" step="1" oninput="vmmemoryOutput.value = this.value+' GB';">
+                            <input class="form-range" type="range" name="vmmemory" value="{{vm_config_template.memory|e}}" min="1" max="128" step="1" oninput="vmmemoryOutput.value = this.value+' GB';">
                     </div>
                     <div class="col-md-2">
                         <output name="vmmemoryOutput" for="vmmemory">
-                        {{vm_config_template.memory}} GB
+                        {{vm_config_template.memory|e}} GB
                         </output>
                     </div>
                 </div>
@@ -103,7 +103,7 @@
                         {{ 'Ballooing Memory Size' | trans }}:                                                                                    
                     </label>
                     <div class="col-md-5">
-                            <input class="form-range" type="range" name="balloon_size" value="{{vm_config_template.balloon_size}}" min="1" max="128" step="1" oninput="memoryOutput.value = this.value+' GB';">
+                            <input class="form-range" type="range" name="balloon_size" value="{{vm_config_template.balloon_size|e}}" min="1" max="128" step="1" oninput="memoryOutput.value = this.value+' GB';">
                     </div>
                     <div class="col-md-2">
                         <output name="memoryOutput" for="balloon_size">

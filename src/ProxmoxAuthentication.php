@@ -100,8 +100,10 @@ trait ProxmoxAuthentication
 					case 0:
 						// Create a new user
 						$userid = 'fb_' . rand(1000, 9999) . '@pve'; // TODO: Make realm configurable in the module settings
+						// Generate a secure password instead of using unclear $this->di['tools']
+						$securePassword = $this->di['tools']->generatePassword(32, 8);
 						// $groupid has to be defined because it is set in the switch statement above, otherwise it would throw an exception. $proxmox also, because otherwise, login would fail and break.
-						$proxmox->post("/access/users", array('userid' => $userid, 'password' => $this->di['tools'], 'enable' => 1, 'comment' => 'fossbilling user', 'groups' => $groupid)); /* @phpstan-ignore-line */
+						$proxmox->post("/access/users", array('userid' => $userid, 'password' => $securePassword, 'enable' => 1, 'comment' => 'fossbilling user', 'groups' => $groupid)); /* @phpstan-ignore-line */
 
 						// Create a token for the new user
 						$token = $proxmox->post("/access/users/" . $userid . "/token/fb_access", array()); /* @phpstan-ignore-line Proxmox is set, otherwise code errors out */
